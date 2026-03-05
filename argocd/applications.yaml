@@ -56,7 +56,7 @@ metadata:
 spec:
   project: togglemaster
   source:
-    repoURL: https://github.com/SEU_USUARIO/TC3-ToggleMaster.git
+    repoURL: https://github.com/rivachef/TC3-ToggleMaster.git
     targetRevision: main
     path: gitops/flag-service
   destination:
@@ -82,7 +82,7 @@ metadata:
 spec:
   project: togglemaster
   source:
-    repoURL: https://github.com/SEU_USUARIO/TC3-ToggleMaster.git
+    repoURL: https://github.com/rivachef/TC3-ToggleMaster.git
     targetRevision: main
     path: gitops/targeting-service
   destination:
@@ -108,7 +108,7 @@ metadata:
 spec:
   project: togglemaster
   source:
-    repoURL: https://github.com/SEU_USUARIO/TC3-ToggleMaster.git
+    repoURL: https://github.com/rivachef/TC3-ToggleMaster.git
     targetRevision: main
     path: gitops/evaluation-service
   destination:
@@ -134,7 +134,7 @@ metadata:
 spec:
   project: togglemaster
   source:
-    repoURL: https://github.com/SEU_USUARIO/TC3-ToggleMaster.git
+    repoURL: https://github.com/rivachef/TC3-ToggleMaster.git
     targetRevision: main
     path: gitops/analytics-service
   destination:
@@ -160,7 +160,7 @@ metadata:
 spec:
   project: togglemaster
   source:
-    repoURL: https://github.com/SEU_USUARIO/TC3-ToggleMaster.git
+    repoURL: https://github.com/rivachef/TC3-ToggleMaster.git
     targetRevision: main
     path: gitops
     directory:

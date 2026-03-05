@@ -17,3 +17,8 @@ output "cluster_arn" {
   description = "ARN do cluster EKS"
   value       = aws_eks_cluster.main.arn
 }
+
+output "cluster_security_group_id" {
+  description = "ID do security group auto-criado pelo EKS (usado pelos nodes)"
+  value       = aws_eks_cluster.main.vpc_config[0].cluster_security_group_id
+}

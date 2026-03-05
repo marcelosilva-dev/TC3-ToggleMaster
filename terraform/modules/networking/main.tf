@@ -210,6 +210,7 @@ resource "aws_security_group" "rds" {
   }
 }
 
+
 ############################
 # Security Group - ElastiCache Redis
 ############################
@@ -242,3 +243,4 @@ resource "aws_security_group" "redis" {
     create_before_destroy = true
   }
 }
+

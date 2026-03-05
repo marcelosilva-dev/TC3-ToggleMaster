@@ -10,6 +10,9 @@ on:
     paths:
       - 'microservices/flag-service/**'
 
+permissions:
+  contents: write
+
 env:
   SERVICE_NAME: flag-service
   SERVICE_PATH: microservices/flag-service

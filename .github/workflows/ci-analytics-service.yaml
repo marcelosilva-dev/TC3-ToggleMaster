@@ -10,6 +10,9 @@ on:
     paths:
       - 'microservices/analytics-service/**'
 
+permissions:
+  contents: write
+
 env:
   SERVICE_NAME: analytics-service
   SERVICE_PATH: microservices/analytics-service

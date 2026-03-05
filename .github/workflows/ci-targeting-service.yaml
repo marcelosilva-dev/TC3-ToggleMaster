@@ -10,6 +10,9 @@ on:
     paths:
       - 'microservices/targeting-service/**'
 
+permissions:
+  contents: write
+
 env:
   SERVICE_NAME: targeting-service
   SERVICE_PATH: microservices/targeting-service

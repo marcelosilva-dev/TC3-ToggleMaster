@@ -10,6 +10,9 @@ on:
     paths:
       - 'microservices/auth-service/**'
 
+permissions:
+  contents: write
+
 env:
   SERVICE_NAME: auth-service
   SERVICE_PATH: microservices/auth-service

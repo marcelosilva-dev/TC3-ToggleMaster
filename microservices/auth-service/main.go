@@ -11,7 +11,8 @@ import (
 	"github.com/joho/godotenv"
 )
 
-// App holds the application dependencies (DB connection and master key).
+// App holds the application dependencies for the Auth Service.
+// DB is the PostgreSQL connection pool, MasterKey is used for admin authentication.
 type App struct {
 	DB        *sql.DB
 	MasterKey string

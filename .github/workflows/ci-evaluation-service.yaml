@@ -10,6 +10,9 @@ on:
     paths:
       - 'microservices/evaluation-service/**'
 
+permissions:
+  contents: write
+
 env:
   SERVICE_NAME: evaluation-service
   SERVICE_PATH: microservices/evaluation-service

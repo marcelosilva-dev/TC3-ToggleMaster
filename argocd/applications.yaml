@@ -33,6 +33,8 @@ spec:
     repoURL: https://github.com/rivachef/TC3-ToggleMaster.git
     targetRevision: main
     path: gitops/auth-service
+    directory:
+      recurse: true
   destination:
     server: https://kubernetes.default.svc
     namespace: togglemaster
@@ -59,6 +61,8 @@ spec:
     repoURL: https://github.com/rivachef/TC3-ToggleMaster.git
     targetRevision: main
     path: gitops/flag-service
+    directory:
+      recurse: true
   destination:
     server: https://kubernetes.default.svc
     namespace: togglemaster
@@ -85,6 +89,8 @@ spec:
     repoURL: https://github.com/rivachef/TC3-ToggleMaster.git
     targetRevision: main
     path: gitops/targeting-service
+    directory:
+      recurse: true
   destination:
     server: https://kubernetes.default.svc
     namespace: togglemaster

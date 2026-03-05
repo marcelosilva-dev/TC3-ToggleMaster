@@ -11,10 +11,10 @@ import (
 	"github.com/joho/godotenv"
 )
 
-// App struct (para injeção de dependência)
+// App holds the application dependencies (DB connection and master key).
 type App struct {
-	DB         *sql.DB
-	MasterKey  string
+	DB        *sql.DB
+	MasterKey string
 }
 
 func main() {

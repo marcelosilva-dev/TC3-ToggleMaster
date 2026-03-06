@@ -119,13 +119,13 @@ ArgoCD detecta mudanca (~3 min polling)
 
 ### 2. Credenciais temporarias (4h)
 - **Desafio:** Sessao AWS Academy expira a cada 4 horas
-- **Decisao:** GitHub Secrets precisam ser atualizados a cada sessao; manifestos GitOps com credenciais AWS nos servicos que acessam SQS/DynamoDB
-- **Impacto:** Operacional - requer atualizacao manual dos secrets
+- **Decisao:** Criado script `update-aws-credentials.sh` que atualiza automaticamente os secrets do evaluation-service e analytics-service no cluster. GitHub Secrets tambem precisam ser atualizados a cada sessao. Scripts suportam credenciais via env vars ou `aws configure`.
+- **Impacto:** Operacional simplificado - um unico comando renova as credenciais no cluster
 
 ### 3. CVEs em dependencias transitivas
 - **Desafio:** Trivy encontrou CVEs CRITICAL em bibliotecas Go upstream (golang.org/x/net)
-- **Decisao:** Configurar Trivy com `exit-code: '0'` para reportar sem bloquear, ja que sao CVEs fora do nosso controle
-- **Impacto:** Seguranca reportada mas nao bloqueante; em producao real, atualizar dependencias
+- **Decisao:** Trivy filesystem scan opera com `exit-code: '1'` (bloqueante) para manter rigor DevSecOps. CVEs em dependencias transitivas devem ser resolvidas atualizando as libs.
+- **Impacto:** Pipeline bloqueante para vulnerabilidades criticas, garantindo seguranca real
 
 ### 4. gosec incompativel com Go 1.21
 - **Desafio:** Versao latest do gosec exige Go >= 1.25
@@ -134,8 +134,13 @@ ArgoCD detecta mudanca (~3 min polling)
 
 ### 5. GITHUB_TOKEN sem permissao de push
 - **Desafio:** Job de update GitOps falhava ao fazer `git push`
-- **Decisao:** Adicionar `permissions: contents: write` nos workflows
-- **Impacto:** Resolvido - pipeline agora faz push automatico
+- **Decisao:** Adicionar `permissions: contents: write` apenas no job `update-gitops` (principio de menor privilegio), nao no workflow global
+- **Impacto:** Resolvido - pipeline agora faz push automatico, com permissoes minimas
+
+### 7. Secrets expostos no git
+- **Desafio:** Credenciais e senhas estavam inline nos `deployment.yaml` commitados no repositorio
+- **Decisao:** Separar secrets em arquivos `secret.yaml` dedicados, adicionar ao `.gitignore`, e criar scripts de automacao (`generate-secrets.sh`, `apply-secrets.sh`) que geram e aplicam os secrets a partir do `terraform output`
+- **Impacto:** Seguranca - nenhuma credencial real no repositorio; operacional - setup automatizado via scripts
 
 ### 6. Security Groups EKS -> RDS/Redis
 - **Desafio:** Pods no EKS nao conseguiam acessar RDS e Redis

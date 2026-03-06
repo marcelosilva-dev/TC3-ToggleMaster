@@ -9,10 +9,27 @@ Este documento descreve **passo a passo** tudo que foi necessario para subir o a
 - AWS Academy com sessao ativa (credenciais temporarias de 4h)
 - Terraform >= 1.5 instalado
 - kubectl instalado
-- Docker instalado
+- Docker instalado (>= 24)
 - AWS CLI v2 configurado
+- Python 3 instalado (usado pelos scripts de automacao)
 - GitHub CLI (gh) instalado (opcional)
 - Conta GitHub com repositorio criado
+
+---
+
+## Scripts de Automacao
+
+O projeto inclui 5 scripts em `scripts/` que automatizam todo o setup:
+
+| Script | Funcao |
+|--------|--------|
+| `setup-full.sh` | **Master** - orquestra todos os 8 passos do setup |
+| `generate-secrets.sh` | Gera os 8 `secret.yaml` a partir do `terraform output` + credenciais AWS |
+| `apply-secrets.sh` | Aplica todos os secrets no cluster Kubernetes |
+| `generate-api-key.sh` | Gera a `SERVICE_API_KEY` via auth-service e atualiza o evaluation-service |
+| `update-aws-credentials.sh` | Renova credenciais AWS nos secrets (a cada 4h) |
+
+> **Nota:** Todos os scripts suportam credenciais AWS tanto via variáveis de ambiente (`export`) quanto via `aws configure`.
 
 ---
 
@@ -20,13 +37,24 @@ Este documento descreve **passo a passo** tudo que foi necessario para subir o a
 
 ### Step 1.1 - Configurar credenciais AWS
 
+**Opcao A — Variaveis de ambiente (recomendado para sessoes temporarias):**
 ```bash
 export AWS_ACCESS_KEY_ID="<seu-access-key>"
 export AWS_SECRET_ACCESS_KEY="<seu-secret-key>"
 export AWS_SESSION_TOKEN="<seu-session-token>"
 export AWS_DEFAULT_REGION="us-east-1"
+```
 
-# Verificar acesso
+**Opcao B — Via `aws configure`:**
+```bash
+aws configure
+# Informar: Access Key, Secret Key, Region (us-east-1), Output (json)
+# Para o Session Token:
+aws configure set aws_session_token "<seu-session-token>"
+```
+
+Verificar acesso:
+```bash
 aws sts get-caller-identity
 ```
 
@@ -60,6 +88,8 @@ lab_role_arn = "arn:aws:iam::<ACCOUNT_ID>:role/LabRole"
 db_password  = "<SUA_SENHA_SEGURA>"
 ```
 
+> **IMPORTANTE:** A `db_password` definida aqui sera usada pelo script `generate-secrets.sh` para gerar automaticamente os secrets do Kubernetes. Nao use a senha placeholder `<SUA_SENHA_SEGURA>`.
+
 ### Step 1.4 - Inicializar e aplicar Terraform
 
 ```bash
@@ -75,7 +105,7 @@ terraform apply -auto-approve
 - 1 ElastiCache Redis
 - 1 tabela DynamoDB (ToggleMasterAnalytics)
 - 1 fila SQS (togglemaster-queue)
-- 5 repositorios ECR
+- 5 repositorios ECR (com tag IMMUTABLE para seguranca)
 - Security Groups para EKS, RDS e Redis
 
 > **Tempo estimado:** ~15-20 minutos para o apply completo.
@@ -94,112 +124,140 @@ terraform init -reconfigure
 
 ---
 
-## FASE 2: Build e Push das Imagens Docker
+## FASE 2: Configurar kubectl
 
-### Step 2.1 - Login no ECR
-
-```bash
-ECR_REGISTRY="<ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com"
-aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin $ECR_REGISTRY
-```
-
-### Step 2.2 - Build e push dos 5 microsservicos
-
-```bash
-# Auth Service (Go)
-docker build --platform linux/amd64 -t $ECR_REGISTRY/auth-service:latest microservices/auth-service
-docker push $ECR_REGISTRY/auth-service:latest
-
-# Flag Service (Python)
-docker build --platform linux/amd64 -t $ECR_REGISTRY/flag-service:latest microservices/flag-service
-docker push $ECR_REGISTRY/flag-service:latest
-
-# Targeting Service (Python)
-docker build --platform linux/amd64 -t $ECR_REGISTRY/targeting-service:latest microservices/targeting-service
-docker push $ECR_REGISTRY/targeting-service:latest
-
-# Evaluation Service (Go)
-docker build --platform linux/amd64 -t $ECR_REGISTRY/evaluation-service:latest microservices/evaluation-service
-docker push $ECR_REGISTRY/evaluation-service:latest
-
-# Analytics Service (Python)
-docker build --platform linux/amd64 -t $ECR_REGISTRY/analytics-service:latest microservices/analytics-service
-docker push $ECR_REGISTRY/analytics-service:latest
-```
-
-> **IMPORTANTE:** Usar `--platform linux/amd64` se estiver em Mac com Apple Silicon (M1/M2/M3).
-
----
-
-## FASE 3: Configurar Kubernetes e ArgoCD
-
-### Step 3.1 - Configurar kubectl para o EKS
+### Step 2.1 - Configurar kubectl para o EKS
 
 ```bash
 aws eks update-kubeconfig --name togglemaster-cluster --region us-east-1
 kubectl get nodes  # Deve mostrar 2 nodes Ready
 ```
 
-### Step 3.2 - Criar namespace
+---
+
+## FASE 3: Setup Automatizado (Recomendado)
+
+Apos o Terraform apply e kubectl configurado, o script master executa todo o setup:
 
 ```bash
-kubectl create namespace togglemaster
+./scripts/setup-full.sh
 ```
 
-### Step 3.3 - Instalar ArgoCD
+O script executa **8 passos** automaticamente:
+
+| Step | Descricao | Script usado |
+|------|-----------|-------------|
+| 0/8 | Verificacoes iniciais (AWS creds, kubectl) | - |
+| 1/8 | Gerar secrets a partir do Terraform output | `generate-secrets.sh` |
+| 2/8 | Instalar ArgoCD no cluster | - |
+| 3/8 | Aplicar secrets no cluster K8s | `apply-secrets.sh` |
+| 4/8 | Build e push de imagens Docker no ECR | - |
+| 5/8 | Aplicar ArgoCD Applications | - |
+| 6/8 | Instalar NGINX Ingress Controller | - |
+| 7/8 | Aguardar pods ficarem prontos | - |
+| 8/8 | Gerar SERVICE_API_KEY | `generate-api-key.sh` |
+
+> **Tempo estimado:** ~10-15 minutos (a maior parte e build Docker + espera de pods).
+
+Ao final, o script exibe:
+- URL do ArgoCD (LoadBalancer)
+- Credenciais do ArgoCD (admin / senha)
+- Comandos para verificacao
+
+### O que o `generate-secrets.sh` faz automaticamente:
+
+1. Le `terraform output -json` para extrair endpoints (RDS, Redis, SQS)
+2. Le `db_password` do `terraform.tfvars`
+3. Detecta credenciais AWS (env vars ou `aws configure`)
+4. Gera uma `MASTER_KEY` aleatoria via `openssl rand -hex 32`
+5. Cria **8 arquivos `secret.yaml`** com `stringData` (sem necessidade de base64 manual):
+   - `gitops/auth-service/secret.yaml` (DATABASE_URL, MASTER_KEY, POSTGRES_PASSWORD)
+   - `gitops/auth-service/db/secret.yaml` (POSTGRES_HOST, DB, USER, PASSWORD)
+   - `gitops/flag-service/secret.yaml` (DATABASE_URL, POSTGRES_PASSWORD)
+   - `gitops/flag-service/db/secret.yaml` (POSTGRES_HOST, DB, USER, PASSWORD)
+   - `gitops/targeting-service/secret.yaml` (DATABASE_URL, POSTGRES_PASSWORD)
+   - `gitops/targeting-service/db/secret.yaml` (POSTGRES_HOST, DB, USER, PASSWORD)
+   - `gitops/evaluation-service/secret.yaml` (REDIS_URL, SQS_URL, AWS creds)
+   - `gitops/analytics-service/secret.yaml` (SQS_URL, AWS creds)
+
+> **IMPORTANTE:** Os arquivos `secret.yaml` estao no `.gitignore` e **nunca** sao commitados no git. Eles existem apenas localmente e sao aplicados diretamente no cluster.
+
+### O que o `generate-api-key.sh` faz automaticamente:
+
+1. Verifica se auth-service esta Running
+2. Abre port-forward para porta 8001
+3. Obtem a MASTER_KEY do secret no cluster
+4. Gera uma API key via `POST /admin/keys` com header `Authorization: Bearer`
+5. Atualiza o `evaluation-service-secret` com a nova chave via `kubectl patch`
+6. Reinicia os pods do evaluation-service para aplicar a mudanca
+
+---
+
+## FASE 3 (Alternativa): Setup Manual Passo a Passo
+
+Se preferir executar manualmente ao inves do `setup-full.sh`:
+
+### Step 3.1 - Gerar secrets a partir do Terraform output
+
+```bash
+./scripts/generate-secrets.sh
+```
+
+### Step 3.2 - Instalar ArgoCD
 
 ```bash
 kubectl create namespace argocd
-kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml --server-side
+kubectl wait --for=condition=available --timeout=300s deployment/argocd-server -n argocd
 ```
 
 #### Erro encontrado: CRD too long
 - **Sintoma:** `kubectl apply` falhava com "metadata.annotations: Too long"
-- **Fix:** Usar `--server-side`:
-```bash
-kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml --server-side
-```
+- **Fix:** Usar `--server-side` (ja incluido no comando acima)
 
-Aguardar pods do ArgoCD ficarem prontos:
-```bash
-kubectl wait --for=condition=available --timeout=300s deployment/argocd-server -n argocd
-```
-
-### Step 3.4 - Expor ArgoCD e obter senha
+### Step 3.3 - Expor ArgoCD e obter senha
 
 ```bash
 # Expor via LoadBalancer
 kubectl patch svc argocd-server -n argocd -p '{"spec": {"type": "LoadBalancer"}}'
 
-# Obter URL
+# Obter URL (pode levar 2-3 min para propagar)
 kubectl get svc argocd-server -n argocd -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
 
 # Obter senha admin
-kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d
+kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d && echo
 ```
 
-> **Nota:** O DNS do LoadBalancer pode levar 2-3 minutos para propagar.
-
-### Step 3.5 - Atualizar manifestos GitOps com endpoints reais
-
-Antes de aplicar as ArgoCD Applications, garantir que os manifestos em `gitops/` contenham os endpoints corretos do Terraform output:
+### Step 3.4 - Aplicar secrets no cluster
 
 ```bash
-terraform output  # Anotar todos os endpoints
+./scripts/apply-secrets.sh
 ```
 
-Atualizar os seguintes arquivos:
-- `gitops/auth-service/deployment.yaml` - DATABASE_URL com endpoint do auth-db
-- `gitops/flag-service/deployment.yaml` - DATABASE_URL com endpoint do flag-db
-- `gitops/targeting-service/deployment.yaml` - DATABASE_URL com endpoint do targeting-db
-- `gitops/evaluation-service/deployment.yaml` - REDIS_ADDR, SQS_QUEUE_URL, credenciais AWS
-- `gitops/analytics-service/deployment.yaml` - SQS_QUEUE_URL, DYNAMODB_TABLE, credenciais AWS
-
-### Step 3.6 - Aplicar ArgoCD Applications e push
+### Step 3.5 - Build e push das imagens Docker
 
 ```bash
-git add gitops/ && git commit -m "update gitops manifests with infra endpoints" && git push
+ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+ECR_REGISTRY="${ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com"
 
+# Login no ECR
+aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin $ECR_REGISTRY
+
+# Build e push dos 5 servicos
+for svc in auth-service flag-service targeting-service evaluation-service analytics-service; do
+  echo ">>> Building $svc..."
+  docker build --platform linux/amd64 -t $ECR_REGISTRY/$svc:latest microservices/$svc
+  docker push $ECR_REGISTRY/$svc:latest
+done
+```
+
+> **IMPORTANTE:** Usar `--platform linux/amd64` se estiver em Mac com Apple Silicon (M1/M2/M3).
+
+> **IMPORTANTE:** As imagens Docker devem ser enviadas ao ECR **antes** de aplicar as ArgoCD Applications, caso contrario os pods ficarao em `ImagePullBackOff`.
+
+### Step 3.6 - Aplicar ArgoCD Applications
+
+```bash
 kubectl apply -f argocd/applications.yaml
 ```
 
@@ -221,6 +279,12 @@ Deve mostrar:
 
 ### Step 3.9 - Gerar SERVICE_API_KEY (para evaluation-service)
 
+**Via script automatizado (recomendado):**
+```bash
+./scripts/generate-api-key.sh
+```
+
+**Manualmente:**
 ```bash
 # Port-forward para auth-service
 kubectl port-forward svc/auth-service 8001:8001 -n togglemaster &
@@ -228,18 +292,26 @@ kubectl port-forward svc/auth-service 8001:8001 -n togglemaster &
 # Obter MASTER_KEY do secret
 MASTER_KEY=$(kubectl get secret auth-service-secret -n togglemaster -o jsonpath='{.data.MASTER_KEY}' | base64 -d)
 
-# Gerar chave
-curl -X POST http://localhost:8001/admin/keys \
+# Gerar chave (ATENCAO ao header e campo corretos)
+curl -s -X POST http://localhost:8001/admin/keys \
   -H "Content-Type: application/json" \
-  -H "X-Master-Key: $MASTER_KEY" \
-  -d '{"description": "evaluation-service key"}'
+  -H "Authorization: Bearer $MASTER_KEY" \
+  -d '{"name": "evaluation-service"}'
 ```
 
-Copiar a chave retornada e atualizar o secret do evaluation-service:
+Copiar o campo `key` da resposta JSON e atualizar o secret:
 ```bash
-kubectl edit secret evaluation-service-secret -n togglemaster
-# Alterar SERVICE_API_KEY para o valor em base64 da chave gerada
+API_KEY="<chave-retornada>"
+API_KEY_B64=$(echo -n "$API_KEY" | base64)
+
+kubectl patch secret evaluation-service-secret -n togglemaster \
+  -p "{\"data\":{\"SERVICE_API_KEY\":\"$API_KEY_B64\"}}"
+
+# Reiniciar evaluation-service para aplicar
+kubectl rollout restart deployment/evaluation-service -n togglemaster
 ```
+
+> **ATENCAO:** O header correto e `Authorization: Bearer $MASTER_KEY` (nao `X-Master-Key`). O campo no JSON e `name` (nao `description`).
 
 ---
 
@@ -273,15 +345,37 @@ git push
 O pipeline executa sequencialmente:
 1. **Build & Unit Test** - Compila e testa
 2. **Linter / Static Analysis** - golangci-lint (Go) ou flake8 (Python)
-3. **Security Scan (SAST & SCA)** - Trivy (SCA) + gosec/bandit (SAST)
-4. **Docker Build & Push to ECR** - Build + Trivy container scan + Push
-5. **Update GitOps Manifests** - Atualiza image tag em `gitops/<service>/deployment.yaml`
+3. **Security Scan (SAST & SCA)** - Trivy SCA (bloqueante, `exit-code: 1`) + gosec/bandit SAST
+4. **Docker Build & Push to ECR** - Build + Trivy container scan + Push (tag: `<commit-sha>`)
+5. **Update GitOps Manifests** - Atualiza image tag em `gitops/<service>/deployment.yaml` + commit automatico
 
 O ArgoCD detecta a mudanca no manifesto e faz rolling update automatico.
 
 ---
 
-## Erros Encontrados e Fixes Durante o CI/CD
+## FASE 5: Manutencao
+
+### Renovar credenciais AWS (a cada 4h)
+
+Quando a sessao AWS Academy expira:
+
+1. Obter novas credenciais do AWS Academy
+2. Configurar via env vars ou `aws configure`
+3. Executar:
+```bash
+./scripts/update-aws-credentials.sh
+```
+
+O script atualiza automaticamente os secrets do `evaluation-service` e `analytics-service` (que usam SQS/DynamoDB) e reinicia os pods.
+
+4. Atualizar tambem os GitHub Secrets (para CI/CD):
+   - `AWS_ACCESS_KEY_ID`
+   - `AWS_SECRET_ACCESS_KEY`
+   - `AWS_SESSION_TOKEN`
+
+---
+
+## Erros Encontrados e Fixes
 
 ### Erro 1: `go.sum` faltando
 - **Sintoma:** Build falhou com "missing go.sum entry"
@@ -307,8 +401,7 @@ Tambem: substituir `io/ioutil` (deprecated) por `io`, e verificar `Redis.Set().E
 ### Erro 3: Trivy bloqueando pipeline
 - **Sintoma:** Security Scan falhava com CVEs CRITICAL em dependencias upstream
 - **Causa:** CVEs em libs transitivas fora do nosso controle (ex: golang.org/x/net)
-- **Fix:** Alterar `exit-code: '1'` para `exit-code: '0'` nos workflows - Trivy reporta mas nao bloqueia
-- **Nota:** Em producao real, manter `exit-code: '1'` e atualizar dependencias
+- **Decisao:** O Trivy filesystem scan opera com `exit-code: '1'` (bloqueante) para garantir DevSecOps rigoroso. Em caso de falso positivo em dependencias transitivas, avaliar atualizacao da lib ou ajustar o workflow temporariamente.
 
 ### Erro 4: gosec incompativel com Go 1.21
 - **Sintoma:** gosec@latest falhava com "requires Go >= 1.25"
@@ -318,28 +411,146 @@ Tambem: substituir `io/ioutil` (deprecated) por `io`, e verificar `Redis.Set().E
 ### Erro 5: GITHUB_TOKEN sem permissao de push
 - **Sintoma:** Job "Update GitOps Manifests" falhava no step "Commit and push"
 - **Causa:** O GITHUB_TOKEN padrao nao tem permissao de write no conteudo do repo
-- **Fix:** Adicionar no topo de cada workflow:
+- **Fix:** Adicionar `permissions: contents: write` no job `update-gitops` (nao no workflow global, para seguir principio de menor privilegio):
 ```yaml
-permissions:
-  contents: write
+update-gitops:
+  name: Update GitOps Manifests
+  needs: docker-build-push
+  runs-on: ubuntu-latest
+  permissions:
+    contents: write
+  steps:
+    ...
 ```
+
+### Erro 6: Secrets com credenciais expostas no git
+- **Sintoma:** Secrets com senhas e credenciais AWS estavam inline nos `deployment.yaml` e commitados no repositorio
+- **Causa:** Manifestos originais incluiam os Secrets diretamente no mesmo arquivo do Deployment
+- **Fix:**
+  1. Extrair Secrets dos `deployment.yaml` para arquivos `secret.yaml` separados
+  2. Adicionar `gitops/**/secret.yaml` ao `.gitignore`
+  3. Criar `secret.yaml.example` com placeholders para cada servico
+  4. Criar scripts de automacao (`generate-secrets.sh`, `apply-secrets.sh`) para gerar e aplicar secrets a partir do Terraform output
+  5. Remover secrets do tracking do git: `git rm --cached gitops/*/secret.yaml gitops/*/db/secret.yaml`
+
+### Erro 7: ImagePullBackOff por ordem de execucao
+- **Sintoma:** Pods ficavam em `ImagePullBackOff` apos aplicar ArgoCD Applications
+- **Causa:** As imagens Docker ainda nao haviam sido enviadas ao ECR quando o ArgoCD tentou fazer deploy
+- **Fix:** Garantir que o build/push Docker aconteca **antes** de aplicar as ArgoCD Applications. O `setup-full.sh` ja segue esta ordem correta.
+
+### Erro 8: `sed` incompativel com macOS
+- **Sintoma:** Script `generate-secrets.sh` nao conseguia extrair `db_password` do `terraform.tfvars` no macOS
+- **Causa:** `sed` do macOS (BSD) nao suporta `\s` (whitespace regex). Apenas o GNU sed suporta.
+- **Fix:** Substituir `sed` por `python3`:
+```bash
+# Antes (ERRADO no macOS):
+DB_PASSWORD=$(grep 'db_password' terraform.tfvars | sed 's/.*=\s*"\(.*\)"/\1/')
+
+# Depois (funciona em macOS e Linux):
+DB_PASSWORD=$(grep 'db_password' terraform.tfvars | python3 -c "import sys; print(sys.stdin.read().split('\"')[1])")
+```
+
+### Erro 9: Header errado para gerar API Key
+- **Sintoma:** `curl` para `/admin/keys` retornava "Acesso nao autorizado"
+- **Causa:** Header incorreto `X-Master-Key` e campo incorreto `description`
+- **Fix:** O auth-service espera:
+  - Header: `Authorization: Bearer $MASTER_KEY`
+  - Campo JSON: `name` (nao `description`)
+```bash
+curl -s -X POST http://localhost:8001/admin/keys \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $MASTER_KEY" \
+  -d '{"name": "evaluation-service"}'
+```
+
+---
+
+## Gestao de Secrets
+
+### Arquitetura de Secrets
+
+Os secrets Kubernetes sao gerenciados **fora do git** por questoes de seguranca:
+
+```
+terraform output (endpoints)  +  terraform.tfvars (db_password)  +  AWS credentials
+                           \                |                      /
+                            +---------------+--------------------+
+                                            |
+                                  generate-secrets.sh
+                                            |
+                                  8 arquivos secret.yaml
+                                  (gitignored, locais)
+                                            |
+                                   apply-secrets.sh
+                                            |
+                                   kubectl apply -f
+                                            |
+                                  Kubernetes Secrets
+                                  (no cluster EKS)
+```
+
+### Formato `stringData` vs `data`
+
+Os secrets usam `stringData` (valores em texto puro) ao inves de `data` (base64). O Kubernetes converte automaticamente para base64 ao aplicar. Isso simplifica a geracao automatica:
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: auth-service-secret
+  namespace: togglemaster
+type: Opaque
+stringData:
+  POSTGRES_PASSWORD: "minha-senha-real"    # texto puro, sem base64
+  MASTER_KEY: "abc123def456..."
+  DATABASE_URL: "postgres://tm_user:minha-senha-real@host:5432/auth_db"
+```
+
+### Templates de Referencia
+
+Cada servico tem um `secret.yaml.example` com placeholders para referencia:
+- `gitops/auth-service/secret.yaml.example`
+- `gitops/flag-service/secret.yaml.example`
+- `gitops/targeting-service/secret.yaml.example`
+- `gitops/evaluation-service/secret.yaml.example`
+- `gitops/analytics-service/secret.yaml.example`
 
 ---
 
 ## Resumo da Sequencia de Execucao
 
+### Via script automatizado (recomendado):
 ```
-1. Exportar credenciais AWS
-2. terraform init && terraform apply (15-20 min)
-3. Build + Push 5 imagens Docker para ECR
-4. Configurar kubectl para EKS
-5. Instalar ArgoCD + expor via LoadBalancer
-6. Atualizar manifestos gitops com endpoints do Terraform
-7. Aplicar ArgoCD Applications
-8. Instalar NGINX Ingress Controller
-9. Verificar todos os pods Running
-10. Gerar SERVICE_API_KEY via auth-service
-11. Configurar GitHub Secrets
-12. Testar CI/CD com push de codigo
-13. Verificar ArgoCD sync automatico
+1. Configurar credenciais AWS (env vars ou aws configure)
+2. terraform init && terraform apply (~15-20 min)
+3. aws eks update-kubeconfig --name togglemaster-cluster --region us-east-1
+4. ./scripts/setup-full.sh (~10-15 min)
+   ├── [1/8] generate-secrets.sh (le terraform output + creds AWS)
+   ├── [2/8] Instala ArgoCD
+   ├── [3/8] apply-secrets.sh (aplica 8 secrets no cluster)
+   ├── [4/8] Build + Push 5 imagens Docker para ECR
+   ├── [5/8] Aplica ArgoCD Applications
+   ├── [6/8] Instala NGINX Ingress Controller
+   ├── [7/8] Aguarda pods ficarem prontos
+   └── [8/8] generate-api-key.sh (gera SERVICE_API_KEY)
+5. Configurar GitHub Secrets (AWS creds + ECR_REGISTRY)
+6. Testar CI/CD com push de codigo
+7. Verificar ArgoCD sync automatico
+```
+
+### Via execucao manual:
+```
+1. Configurar credenciais AWS (env vars ou aws configure)
+2. terraform init && terraform apply (~15-20 min)
+3. aws eks update-kubeconfig
+4. ./scripts/generate-secrets.sh
+5. Instalar ArgoCD (kubectl create ns + apply --server-side)
+6. ./scripts/apply-secrets.sh
+7. Build + Push 5 imagens Docker para ECR
+8. kubectl apply -f argocd/applications.yaml
+9. Instalar NGINX Ingress Controller
+10. Verificar todos os pods Running
+11. ./scripts/generate-api-key.sh
+12. Configurar GitHub Secrets
+13. Testar CI/CD com push de codigo
 ```

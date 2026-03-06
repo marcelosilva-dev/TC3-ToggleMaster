@@ -18,7 +18,8 @@
 
 **O que mostrar:**
 
-- [ ] Abrir o repositorio no GitHub e mostrar a estrutura `terraform/`
+- [ ] Abrir o repositorio no GitHub e mostrar a estrutura geral (`terraform/`, `microservices/`, `gitops/`, `scripts/`)
+- [ ] Mostrar a pasta `scripts/` e explicar a automacao (`setup-full.sh` orquestra tudo)
 - [ ] Mostrar a organizacao em modulos: `networking`, `eks`, `databases`, `messaging`, `ecr`
 - [ ] Abrir `terraform/main.tf` e explicar como os modulos se conectam
 - [ ] Mostrar `terraform/backend.tf` - backend remoto no S3 com lock no DynamoDB
@@ -47,10 +48,11 @@
 **O que mostrar:**
 
 - [ ] Abrir `.github/workflows/ci-auth-service.yaml` e explicar os 5 jobs sequenciais
+- [ ] Destacar que `permissions: contents: write` esta apenas no job `update-gitops` (menor privilegio)
 - [ ] Destacar cada estagio:
   1. Build & Unit Test (go build + go test)
   2. Linter (golangci-lint)
-  3. Security Scan: Trivy (SCA) + gosec (SAST)
+  3. Security Scan: Trivy SCA (bloqueante, exit-code: 1) + gosec SAST
   4. Docker Build + Trivy container scan + Push ECR
   5. Update GitOps Manifests (commit automatico)
 
@@ -88,16 +90,17 @@
 - [ ] Abrir o historico de commits no GitHub
 - [ ] Mostrar o commit automatico do `github-actions[bot]`:
   ```
-  chore: update auth-service image to c3f95c6
+  chore: update auth-service image to <commit-sha>
   ```
 - [ ] Abrir o arquivo `gitops/auth-service/deployment.yaml` e mostrar a tag da imagem atualizada:
   ```yaml
-  image: 007907262286.dkr.ecr.us-east-1.amazonaws.com/auth-service:c3f95c6
+  image: <ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/auth-service:<commit-sha>
   ```
+- [ ] Explicar que os **secrets nao estao no git** — sao gerenciados externamente via scripts (`generate-secrets.sh`)
 - [ ] Explicar o fluxo: CI faz push da imagem pro ECR e atualiza o manifesto GitOps automaticamente
 
 **Fala sugerida:**
-> "Ao final do pipeline de CI, um job automatico atualiza a tag da imagem no repositorio GitOps. Isso desacopla o CI do deploy - quem faz o deploy e o ArgoCD."
+> "Ao final do pipeline de CI, um job automatico atualiza a tag da imagem no repositorio GitOps. Isso desacopla o CI do deploy - quem faz o deploy e o ArgoCD. Os secrets sao gerenciados fora do git por seguranca, usando scripts que leem automaticamente o output do Terraform."
 
 ---
 
@@ -155,7 +158,9 @@
   - AWS Academy com LabRole (sem IAM)
   - 5 pipelines independentes com DevSecOps
   - ArgoCD auto-sync com selfHeal
-- [ ] Mencionar desafios encontrados (credenciais temporarias, CVEs em upstream, gosec version)
+  - Secrets gerenciados fora do git, com scripts de automacao
+  - `permissions: contents: write` no job (menor privilegio)
+- [ ] Mencionar desafios encontrados (credenciais temporarias, CVEs em upstream, gosec version, secrets no git)
 - [ ] Agradecer
 
 ---

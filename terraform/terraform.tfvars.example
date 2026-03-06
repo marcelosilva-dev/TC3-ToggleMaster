@@ -7,5 +7,5 @@ project_name = "togglemaster"
 # AWS Academy - ARN da LabRole (substitua pelo seu)
 lab_role_arn = "arn:aws:iam::ACCOUNT_ID:role/LabRole"
 
-# Senha do PostgreSQL
-db_password = "tm_pass_26"
+# Senha do PostgreSQL (substitua por uma senha forte)
+db_password = "<SUA_SENHA_SEGURA>"

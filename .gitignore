@@ -3,7 +3,6 @@ terraform/.terraform/
 terraform/*.tfstate
 terraform/*.tfstate.*
 terraform/*.tfvars
-terraform/.terraform.lock.hcl
 terraform/crash.log
 
 # OS
@@ -30,3 +29,6 @@ venv/
 vendor/
 microservices/auth-service/auth-service
 microservices/evaluation-service/evaluation-service
+
+# Kubernetes Secrets (managed externally, not tracked in git)
+gitops/**/secret.yaml

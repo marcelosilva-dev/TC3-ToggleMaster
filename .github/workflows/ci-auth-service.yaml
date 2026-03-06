@@ -10,9 +10,6 @@ on:
     paths:
       - 'microservices/auth-service/**'
 
-permissions:
-  contents: write
-
 env:
   SERVICE_NAME: auth-service
   SERVICE_PATH: microservices/auth-service
@@ -84,7 +81,7 @@ jobs:
           scan-type: 'fs'
           scan-ref: 'microservices/auth-service'
           severity: 'CRITICAL,HIGH'
-          exit-code: '0'
+          exit-code: '1'
 
       - name: SAST - Install gosec
         run: go install github.com/securego/gosec/v2/cmd/gosec@v2.20.0
@@ -140,6 +137,8 @@ jobs:
     needs: docker-build-push
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
         with:

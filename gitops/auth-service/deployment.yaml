@@ -8,16 +8,9 @@ data:
   POSTGRES_USER: "tm_user"
   POSTGRES_DB: "auth_db"
 ---
-apiVersion: v1
-kind: Secret
-metadata:
-  name: auth-service-secret
-  namespace: togglemaster
-type: Opaque
-data:
-  POSTGRES_PASSWORD: "dG1fcGFzc18yNg=="
-  MASTER_KEY: "YWRtaW4tc2VjcmV0by0xMjM="
-  DATABASE_URL: "cG9zdGdyZXM6Ly90bV91c2VyOnRtX3Bhc3NfMjZAdG9nZ2xlbWFzdGVyLWF1dGgtZGIuYzNiYnBrajNwY21rLnVzLWVhc3QtMS5yZHMuYW1hem9uYXdzLmNvbTo1NDMyL2F1dGhfZGI="
+# Secret "auth-service-secret" is managed externally (not tracked in git).
+# Apply manually: kubectl apply -f gitops/auth-service/secret.yaml
+# See secret.yaml.example for the template.
 ---
 apiVersion: apps/v1
 kind: Deployment

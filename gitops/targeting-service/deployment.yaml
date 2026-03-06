@@ -9,15 +9,9 @@ data:
   POSTGRES_DB: "targeting_db"
   AUTH_SERVICE_URL: "http://auth-service:8001"
 ---
-apiVersion: v1
-kind: Secret
-metadata:
-  name: targeting-service-secret
-  namespace: togglemaster
-type: Opaque
-data:
-  POSTGRES_PASSWORD: "dG1fcGFzc18yNg=="
-  DATABASE_URL: "cG9zdGdyZXM6Ly90bV91c2VyOnRtX3Bhc3NfMjZAdG9nZ2xlbWFzdGVyLXRhcmdldGluZy1kYi5jM2JicGtqM3BjbWsudXMtZWFzdC0xLnJkcy5hbWF6b25hd3MuY29tOjU0MzIvdGFyZ2V0aW5nX2Ri"
+# Secret "targeting-service-secret" is managed externally (not tracked in git).
+# Apply manually: kubectl apply -f gitops/targeting-service/secret.yaml
+# See secret.yaml.example for the template.
 ---
 apiVersion: apps/v1
 kind: Deployment

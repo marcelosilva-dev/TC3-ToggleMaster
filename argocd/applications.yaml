@@ -9,7 +9,7 @@ metadata:
 spec:
   description: ToggleMaster Feature Flag Platform
   sourceRepos:
-    - '*'
+    - 'https://github.com/rivachef/TC3-ToggleMaster.git'
   destinations:
     - namespace: togglemaster
       server: https://kubernetes.default.svc

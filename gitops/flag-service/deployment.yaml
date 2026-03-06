@@ -9,15 +9,9 @@ data:
   POSTGRES_DB: "flag_db"
   AUTH_SERVICE_URL: "http://auth-service:8001"
 ---
-apiVersion: v1
-kind: Secret
-metadata:
-  name: flag-service-secret
-  namespace: togglemaster
-type: Opaque
-data:
-  POSTGRES_PASSWORD: "dG1fcGFzc18yNg=="
-  DATABASE_URL: "cG9zdGdyZXM6Ly90bV91c2VyOnRtX3Bhc3NfMjZAdG9nZ2xlbWFzdGVyLWZsYWctZGIuYzNiYnBrajNwY21rLnVzLWVhc3QtMS5yZHMuYW1hem9uYXdzLmNvbTo1NDMyL2ZsYWdfZGI="
+# Secret "flag-service-secret" is managed externally (not tracked in git).
+# Apply manually: kubectl apply -f gitops/flag-service/secret.yaml
+# See secret.yaml.example for the template.
 ---
 apiVersion: apps/v1
 kind: Deployment

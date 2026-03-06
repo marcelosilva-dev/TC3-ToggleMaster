@@ -57,7 +57,7 @@ Editar `terraform.tfvars`:
 aws_region   = "us-east-1"
 project_name = "togglemaster"
 lab_role_arn = "arn:aws:iam::<ACCOUNT_ID>:role/LabRole"
-db_password  = "tm_pass_26"
+db_password  = "<SUA_SENHA_SEGURA>"
 ```
 
 ### Step 1.4 - Inicializar e aplicar Terraform

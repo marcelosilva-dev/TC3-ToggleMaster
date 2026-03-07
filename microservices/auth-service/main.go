@@ -2,7 +2,7 @@ package main
 
 import (
 	"database/sql"
-	// "fmt"
+	"fmt" // ADICIONADO PARA TESTE (não é usado em lugar nenhum)
 	"log"
 	"net/http"
 	"os"

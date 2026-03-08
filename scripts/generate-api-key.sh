@@ -4,15 +4,12 @@
 #
 # Gera uma SERVICE_API_KEY via auth-service e atualiza automaticamente
 # o secret do evaluation-service.
-#
-# Uso (apos os pods estarem Running):
-#   ./scripts/generate-api-key.sh
 ###############################################################################
 set -e
 
 echo "============================================"
 echo "  ToggleMaster - Gerar SERVICE_API_KEY"
-echo "============================================"
+echo "============================================ "
 echo ""
 
 # Verificar se auth-service esta rodando
@@ -21,22 +18,20 @@ AUTH_STATUS=$(kubectl get pods -n togglemaster -l app=auth-service -o jsonpath='
 
 if [ "$AUTH_STATUS" != "Running" ]; then
   echo "ERRO: auth-service nao esta Running (status: $AUTH_STATUS)"
-  echo "Aguarde os pods subirem: kubectl get pods -n togglemaster -w"
   exit 1
 fi
 echo "  [OK] auth-service esta Running"
-echo ""
 
-# Verificar se porta 8001 ja esta em uso
+# Liberar porta 8001 se estiver ocupada
 if lsof -i :8001 > /dev/null 2>&1; then
-  echo "  AVISO: Porta 8001 ja em uso. Tentando liberar..."
+  echo "  AVISO: Porta 8001 em uso. Liberando..."
   kill $(lsof -t -i :8001) 2>/dev/null || true
   sleep 2
 fi
 
 # Port-forward em background
 echo ">>> Abrindo port-forward para auth-service..."
-kubectl port-forward svc/auth-service 8001:8001 -n togglemaster &
+kubectl port-forward svc/auth-service 8001:8001 -n togglemaster > /dev/null 2>&1 &
 PF_PID=$!
 sleep 3
 
@@ -46,57 +41,44 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# Obter MASTER_KEY
+# Obter MASTER_KEY (Limpando quebras de linha do base64)
 echo ">>> Obtendo MASTER_KEY do secret..."
 MASTER_KEY=$(kubectl get secret auth-service-secret -n togglemaster \
-  -o jsonpath='{.data.MASTER_KEY}' | base64 -d)
+  -o jsonpath='{.data.MASTER_KEY}' | base64 -d | tr -d '\n' | tr -d '\r')
 
-if [ -z "$MASTER_KEY" ]; then
-  echo "ERRO: MASTER_KEY nao encontrada no secret auth-service-secret"
-  exit 1
-fi
-echo "  [OK] MASTER_KEY: ${MASTER_KEY:0:8}..."
-echo ""
+echo "  [OK] MASTER_KEY obtida."
 
-# Gerar API key
+# Gerar API key e limpar a saida
 echo ">>> Gerando API key via auth-service..."
 RESPONSE=$(curl -s -X POST http://localhost:8001/admin/keys \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $MASTER_KEY" \
   -d '{"name": "evaluation-service"}')
 
-API_KEY=$(echo "$RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin).get('key',''))" 2>/dev/null || echo "")
+# Extração limpa da chave
+API_KEY=$(echo "$RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin).get('key',''))" 2>/dev/null | tr -d '\n' | tr -d '\r')
 
 if [ -z "$API_KEY" ]; then
-  echo "ERRO: Nao foi possivel gerar a API key."
-  echo "Resposta do auth-service: $RESPONSE"
+  echo "ERRO: Nao foi possivel gerar a API key. Resposta: $RESPONSE"
   exit 1
 fi
-echo "  [OK] API Key gerada: ${API_KEY:0:15}..."
-echo ""
+echo "  [OK] API Key gerada com sucesso."
 
-# Atualizar o secret do evaluation-service via kubectl patch
-echo ">>> Atualizando evaluation-service-secret com a nova API key..."
-API_KEY_B64=$(echo -n "$API_KEY" | base64)
-
+# --- CORREÇÃO AQUI ---
+# Atualizar usando stringData para evitar erros de escape/JSON
+echo ">>> Atualizando evaluation-service-secret..."
 kubectl patch secret evaluation-service-secret -n togglemaster \
-  -p "{\"data\":{\"SERVICE_API_KEY\":\"$API_KEY_B64\"}}"
+  --type='merge' \
+  -p "{\"stringData\":{\"SERVICE_API_KEY\":\"$API_KEY\"}}"
 
-echo "  [OK] evaluation-service-secret atualizado"
+echo "  [OK] Secret atualizado via stringData."
 echo ""
 
-# Restart dos pods do evaluation-service para pegar o novo secret
+# Reiniciar pods
 echo ">>> Reiniciando pods do evaluation-service..."
 kubectl rollout restart deployment/evaluation-service -n togglemaster
 kubectl rollout status deployment/evaluation-service -n togglemaster --timeout=120s
-echo ""
 
 echo "============================================"
-echo "  SERVICE_API_KEY configurada com sucesso!"
+echo "  SETUP FINALIZADO COM SUCESSO!"
 echo "============================================"
-echo ""
-echo "API Key: $API_KEY"
-echo ""
-echo "Todos os servicos devem estar operacionais agora."
-echo "Verifique: kubectl get pods -n togglemaster"
-echo ""

@@ -146,13 +146,25 @@ terraform apply -auto-approve   # ~15-20 min
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 ECR_REGISTRY="${ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com"
 
-# Login no ECR
+# 1. Login no ECR (Garante que a sessão ainda está ativa)
 aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin $ECR_REGISTRY
 
-# Build e push dos 5 servicos
+# 2. Loop de Build e Push com correções de compatibilidade
 for svc in auth-service flag-service targeting-service evaluation-service analytics-service; do
-  echo ">>> Building $svc..."
-  docker build --platform linux/amd64 -t $ECR_REGISTRY/$svc:latest microservices/$svc
+  echo "--------------------------------------------"
+  echo ">>> Processando: $svc"
+  echo "--------------------------------------------"
+
+  # Limpa a tag 'latest' no ECR para evitar erro de manifesto/conflito de layers
+  aws ecr batch-delete-image --repository-name "$svc" --image-ids imageTag=latest --region us-east-1 2>/dev/null || true
+
+  # Build com flags de compatibilidade:
+  # --provenance=false: Resolve o erro 400 Bad Request (Manifesto)
+  # --no-cache: Garante que não use camadas corrompidas locais
+  docker build --no-cache --provenance=false --platform linux/amd64 -t $ECR_REGISTRY/$svc:latest microservices/$svc
+
+  # Push da imagem limpa
+  echo ">>> Enviando $svc para o ECR..."
   docker push $ECR_REGISTRY/$svc:latest
 done
 ```

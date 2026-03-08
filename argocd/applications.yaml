@@ -9,7 +9,7 @@ metadata:
 spec:
   description: ToggleMaster Feature Flag Platform
   sourceRepos:
-    - 'https://github.com/rivachef/TC3-ToggleMaster.git'
+    - 'https://github.com/marcelosilva-dev/TC3-ToggleMaster.git'
   destinations:
     - namespace: togglemaster
       server: https://kubernetes.default.svc
@@ -30,7 +30,7 @@ metadata:
 spec:
   project: togglemaster
   source:
-    repoURL: https://github.com/rivachef/TC3-ToggleMaster.git
+    repoURL: https://github.com/marcelosilva-dev/TC3-ToggleMaster.git
     targetRevision: main
     path: gitops/auth-service
     directory:
@@ -58,7 +58,7 @@ metadata:
 spec:
   project: togglemaster
   source:
-    repoURL: https://github.com/rivachef/TC3-ToggleMaster.git
+    repoURL: https://github.com/marcelosilva-dev/TC3-ToggleMaster.git
     targetRevision: main
     path: gitops/flag-service
     directory:
@@ -86,7 +86,7 @@ metadata:
 spec:
   project: togglemaster
   source:
-    repoURL: https://github.com/rivachef/TC3-ToggleMaster.git
+    repoURL: https://github.com/marcelosilva-dev/TC3-ToggleMaster.git
     targetRevision: main
     path: gitops/targeting-service
     directory:
@@ -114,7 +114,7 @@ metadata:
 spec:
   project: togglemaster
   source:
-    repoURL: https://github.com/rivachef/TC3-ToggleMaster.git
+    repoURL: https://github.com/marcelosilva-dev/TC3-ToggleMaster.git
     targetRevision: main
     path: gitops/evaluation-service
   destination:
@@ -140,7 +140,7 @@ metadata:
 spec:
   project: togglemaster
   source:
-    repoURL: https://github.com/rivachef/TC3-ToggleMaster.git
+    repoURL: https://github.com/marcelosilva-dev/TC3-ToggleMaster.git
     targetRevision: main
     path: gitops/analytics-service
   destination:
@@ -166,7 +166,7 @@ metadata:
 spec:
   project: togglemaster
   source:
-    repoURL: https://github.com/rivachef/TC3-ToggleMaster.git
+    repoURL: https://github.com/marcelosilva-dev/TC3-ToggleMaster.git
     targetRevision: main
     path: gitops
     directory:
